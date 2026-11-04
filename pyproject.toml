@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sbaniso"
+version = "0.1.0"
+description = "Spin bodies under uniaxial anisotropy: axis selection and the Ising-KT crossing (Paper II)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "numba", "matplotlib", "pyyaml", "h5py"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+# Full spin-body model (task T2): polyspin with the anisotropy extension, pinned to a tag.
+# Fill in the tag after the anisotropy branch of Polyhedron_Spin_Group is merged and tagged.
+fullmodel = ["polyspin @ git+https://github.com/cywon-commits/Polyhedron_Spin_Group@TAG_TO_FILL"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: multi-minute statistical tests"]
