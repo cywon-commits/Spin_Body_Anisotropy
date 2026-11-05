@@ -1,0 +1,21 @@
+name: n0_j2zero_ising_L16
+model:
+  couplings:
+  - 1.9753086419753085
+  - 0.0
+  - 6.320987654320987
+L: 16
+temperatures:
+  Tmin: 4.306172839506173
+  Tmax: 4.661728395061728
+  n: 10
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 3300
+start: random
+checkpoint_every: 2000
+output: runs/n0/j2zero_ising_L16.h5

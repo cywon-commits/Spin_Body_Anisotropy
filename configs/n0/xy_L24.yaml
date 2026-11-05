@@ -1,0 +1,21 @@
+name: n0_xy_L24
+model:
+  couplings:
+  - 0.0
+  - 1.0
+  - 0.0
+L: 24
+temperatures:
+  Tmin: 0.82
+  Tmax: 1.02
+  n: 10
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 0
+- 0
+- 1
+seed: 1001
+start: random
+checkpoint_every: 2000
+output: runs/n0/xy_L24.h5

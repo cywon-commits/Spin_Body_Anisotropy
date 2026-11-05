@@ -1,0 +1,21 @@
+name: n0_j2zero_kt_L64
+model:
+  couplings:
+  - 1.9753086419753085
+  - 0.0
+  - 6.320987654320987
+L: 64
+temperatures:
+  Tmin: 5.183209876543209
+  Tmax: 6.4474074074074075
+  n: 22
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 3202
+start: random
+checkpoint_every: 2000
+output: runs/n0/j2zero_kt_L64.h5

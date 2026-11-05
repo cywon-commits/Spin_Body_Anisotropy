@@ -1,0 +1,21 @@
+name: n0_ising_L64
+model:
+  couplings:
+  - 1.0
+  - 0.0
+  - 0.0
+L: 64
+temperatures:
+  Tmin: 2.18
+  Tmax: 2.36
+  n: 12
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 0
+- 0
+seed: 2002
+start: random
+checkpoint_every: 2000
+output: runs/n0/ising_L64.h5

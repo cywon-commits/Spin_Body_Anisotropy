@@ -1,0 +1,21 @@
+name: n0_pilot_r3.8_L32
+model:
+  couplings:
+  - 1.9753086419753085
+  - 1.5802469135802468
+  - 6.004938271604938
+L: 32
+temperatures:
+  Tmin: 6.3
+  Tmax: 8.0
+  n: 14
+ntherm: 1000
+nmeas: 20000
+clusters:
+- 1
+- 1
+- 1
+seed: 4000
+start: random
+checkpoint_every: 2000
+output: runs/n0/pilot_r3.8_L32.h5

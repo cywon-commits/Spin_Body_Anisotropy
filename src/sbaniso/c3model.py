@@ -13,6 +13,8 @@ Rigid tetrahedron (n = 4) with inter-body couplings G x^3 + H4 x^4 per spin pair
     J1 = 160/81 G,  J2 = 128/81 G,  J4 = 512/729 H4,   r = J4/J2 = (4/9) zH4/zG.
 
 Couplings are passed to every kernel as c = np.array([J1, J2, J4]).  Square lattice, periodic.
+Random numbers: every kernel takes st = uint64[4], the xoshiro256** state of the replica it updates
+(sbaniso.rng), so replicas can be updated in parallel and runs are reproducible from one seed.
 
 Updates
     sweep            Metropolis: s flip / (s flip, phi + pi) / phi rotation
@@ -25,6 +27,8 @@ All cluster moves accept any sign of the bond (a bond joins when K s s' > 0, res
 """
 import numpy as np
 from numba import njit
+
+from .rng import randint, uniform
 
 J1_PER_G = 160.0 / 81.0
 J2_PER_G = 128.0 / 81.0
@@ -39,11 +43,6 @@ def couplings_from_r(r, G=1.0):
 def couplings_from_body(zG, zH4, z=4):
     G, H4 = zG / z, zH4 / z
     return np.array([J1_PER_G * G, J2_PER_G * G, J4_PER_H4 * H4])
-
-
-@njit(cache=True)
-def seed(x):
-    np.random.seed(x)
 
 
 @njit(cache=True)
@@ -69,12 +68,12 @@ def energy(s, p, L, c):
 
 
 @njit(cache=True)
-def sweep(s, p, L, beta, c, delta):
+def sweep(s, p, L, beta, c, delta, st):
     acc = 0
     for _ in range(L * L):
-        i = np.random.randint(L)
-        j = np.random.randint(L)
-        u = np.random.random()
+        i = randint(st, L)
+        j = randint(st, L)
+        u = uniform(st)
         s_new = s[i, j]
         p_new = p[i, j]
         if u < 0.3:
@@ -83,9 +82,9 @@ def sweep(s, p, L, beta, c, delta):
             s_new = -s_new
             p_new = p_new + np.pi
         else:
-            p_new = p_new + delta * (2 * np.random.random() - 1)
+            p_new = p_new + delta * (2 * uniform(st) - 1)
         dE = local_e(s, p, i, j, L, s_new, p_new, c) - local_e(s, p, i, j, L, s[i, j], p[i, j], c)
-        if dE <= 0 or np.random.random() < np.exp(-beta * dE):
+        if dE <= 0 or uniform(st) < np.exp(-beta * dE):
             s[i, j] = s_new
             p[i, j] = p_new
             acc += 1
@@ -93,9 +92,9 @@ def sweep(s, p, L, beta, c, delta):
 
 
 @njit(cache=True)
-def wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem):
+def wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem, st):
     """s cluster at fixed phi: Ising bonds K = J1 + J4 cos(dphi)."""
-    i0 = np.random.randint(L); j0 = np.random.randint(L)
+    i0 = randint(st, L); j0 = randint(st, L)
     inc[i0, j0] = True
     stack[0, 0] = i0; stack[0, 1] = j0
     n = 1; size = 0
@@ -110,7 +109,7 @@ def wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem):
             if inc[a, b]:
                 continue
             x = (c[0] + c[2] * np.cos(p[i, j] - p[a, b])) * s[i, j] * s[a, b]
-            if x > 0 and np.random.random() < 1 - np.exp(-2 * beta * x):
+            if x > 0 and uniform(st) < 1 - np.exp(-2 * beta * x):
                 inc[a, b] = True
                 stack[n, 0] = a; stack[n, 1] = b; n += 1
     for k in range(size):
@@ -121,9 +120,9 @@ def wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem):
 
 
 @njit(cache=True)
-def wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem):
+def wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem, st):
     """s cluster at fixed psi: flip s and phi -> phi + pi.  Ising bonds K = J1 + J2 cos(dpsi)."""
-    i0 = np.random.randint(L); j0 = np.random.randint(L)
+    i0 = randint(st, L); j0 = randint(st, L)
     inc[i0, j0] = True
     stack[0, 0] = i0; stack[0, 1] = j0
     n = 1; size = 0
@@ -140,7 +139,7 @@ def wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem):
             ss = s[i, j] * s[a, b]
             cos_dpsi = ss * np.cos(p[i, j] - p[a, b])
             x = (c[0] + c[1] * cos_dpsi) * ss
-            if x > 0 and np.random.random() < 1 - np.exp(-2 * beta * x):
+            if x > 0 and uniform(st) < 1 - np.exp(-2 * beta * x):
                 inc[a, b] = True
                 stack[n, 0] = a; stack[n, 1] = b; n += 1
     for k in range(size):
@@ -152,10 +151,10 @@ def wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem):
 
 
 @njit(cache=True)
-def wolff_phi(s, p, L, beta, c, stack, inc, mem):
+def wolff_phi(s, p, L, beta, c, stack, inc, mem, st):
     """Wolff embedding (reflection about a random axis) for phi at fixed s; bonds J2 + J4 s s'."""
-    ax = 2 * np.pi * np.random.random()
-    i0 = np.random.randint(L); j0 = np.random.randint(L)
+    ax = 2 * np.pi * uniform(st)
+    i0 = randint(st, L); j0 = randint(st, L)
     inc[i0, j0] = True
     stack[0, 0] = i0; stack[0, 1] = j0
     n = 1; size = 0
@@ -171,7 +170,7 @@ def wolff_phi(s, p, L, beta, c, stack, inc, mem):
             if inc[a, b]:
                 continue
             x = (c[1] + c[2] * s[i, j] * s[a, b]) * ui * np.cos(p[a, b] - ax)
-            if x > 0 and np.random.random() < 1 - np.exp(-2 * beta * x):
+            if x > 0 and uniform(st) < 1 - np.exp(-2 * beta * x):
                 inc[a, b] = True
                 stack[n, 0] = a; stack[n, 1] = b; n += 1
     for k in range(size):
@@ -182,7 +181,7 @@ def wolff_phi(s, p, L, beta, c, stack, inc, mem):
 
 
 @njit(cache=True)
-def full_step(s, p, L, beta, c, delta, stack, inc, mem, ncl, sizes):
+def full_step(s, p, L, beta, c, delta, stack, inc, mem, ncl, sizes, st):
     """One Metropolis sweep, then a FIXED number of clusters of each type:
     ncl = (n_sigma_phi, n_sigma_psi, n_phi).  sizes[k] accumulates the flipped sites (for tuning).
 
@@ -190,25 +189,34 @@ def full_step(s, p, L, beta, c, delta, stack, inc, mem, ncl, sizes):
     'build clusters until ~N sites were flipped' is a state-dependent stopping time and biases the
     sampled distribution (6x6 Ising at T = 2.5: <m^2> = 0.610 instead of the exact 0.5286;
     see tests/test_c3model.py::test_exact_ising_6x6).  Tune ncl during equilibration only."""
-    acc = sweep(s, p, L, beta, c, delta)
+    acc = sweep(s, p, L, beta, c, delta, st)
     for k in range(ncl[0]):
-        sizes[0] += wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem)
+        sizes[0] += wolff_sigma_phi(s, p, L, beta, c, stack, inc, mem, st)
     for k in range(ncl[1]):
-        sizes[1] += wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem)
+        sizes[1] += wolff_sigma_psi(s, p, L, beta, c, stack, inc, mem, st)
     for k in range(ncl[2]):
-        sizes[2] += wolff_phi(s, p, L, beta, c, stack, inc, mem)
+        sizes[2] += wolff_phi(s, p, L, beta, c, stack, inc, mem, st)
     return acc
 
 
 @njit(cache=True)
 def measure(s, p, L, c, out):
     """out[0]=E, [1]=sum s, [2..5]=cx,sx,cy,sy (helicity parts for a twist of phi, identical to a
-    twist of psi), [6],[7]=Re,Im sum exp(i phi), [8],[9]=Re,Im sum exp(i psi) = s exp(i phi)."""
+    twist of psi), [6],[7]=Re,Im sum exp(i phi), [8],[9]=Re,Im sum exp(i psi) = s exp(i phi),
+    [10],[11],[12] = |F(k_min)|^2 of s, exp(i phi), exp(i psi), averaged over k = (2pi/L, 0) and
+    (0, 2pi/L)  (second-moment correlation length: xi = sqrt(<|F(0)|^2>/<|F(k)|^2> - 1)/(2 sin(pi/L)))."""
     E = 0.0; m = 0.0
     cx = 0.0; sx = 0.0; cy = 0.0; sy = 0.0
     fr = 0.0; fi = 0.0; sr = 0.0; si = 0.0
+    # Fourier sums along x (index i) and y (index j): complex amplitudes of each field
+    ax_s = 0.0 + 0.0j; ay_s = 0.0 + 0.0j
+    ax_f1 = 0.0 + 0.0j; ay_f1 = 0.0 + 0.0j      # exp(i phi) at +k
+    ax_f2 = 0.0 + 0.0j; ay_f2 = 0.0 + 0.0j      # exp(i psi) at +k
+    w = 2.0 * np.pi / L
     for i in range(L):
+        ei = np.cos(w * i) + 1j * np.sin(w * i)
         for j in range(L):
+            ej = np.cos(w * j) + 1j * np.sin(w * j)
             a = (i + 1) % L
             b = (j + 1) % L
             ssx = s[i, j] * s[a, j]
@@ -224,12 +232,22 @@ def measure(s, p, L, c, out):
             co = np.cos(p[i, j]); sn = np.sin(p[i, j])
             fr += co; fi += sn
             sr += s[i, j] * co; si += s[i, j] * sn
+            z1 = co + 1j * sn
+            z2 = s[i, j] * z1
+            ax_s += s[i, j] * ei; ay_s += s[i, j] * ej
+            ax_f1 += z1 * ei; ay_f1 += z1 * ej
+            ax_f2 += z2 * ei; ay_f2 += z2 * ej
     out[0] = E; out[1] = m
     out[2] = cx; out[3] = sx; out[4] = cy; out[5] = sy
     out[6] = fr; out[7] = fi; out[8] = sr; out[9] = si
+    out[10] = 0.5 * (abs(ax_s) ** 2 + abs(ay_s) ** 2)
+    out[11] = 0.5 * (abs(ax_f1) ** 2 + abs(ay_f1) ** 2)
+    out[12] = 0.5 * (abs(ax_f2) ** 2 + abs(ay_f2) ** 2)
 
 
-NOBS = 10
+OBS_NAMES = ("E", "m_sigma", "cx", "sx", "cy", "sy", "Mphi_re", "Mphi_im", "Mpsi_re", "Mpsi_im",
+             "Fk_sigma", "Fk_phi", "Fk_psi")
+NOBS = len(OBS_NAMES)
 
 
 def new_state(L, rng=None, ordered=False):

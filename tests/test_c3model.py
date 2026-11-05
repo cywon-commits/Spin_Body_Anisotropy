@@ -2,8 +2,9 @@ import numpy as np
 import pytest
 
 from sbaniso.c3model import (couplings_from_body, couplings_from_r, energy, full_step, local_e,
-                             measure, new_state, seed, sweep, wolff_phi, wolff_sigma_phi,
+                             measure, new_state, sweep, wolff_phi, wolff_sigma_phi,
                              wolff_sigma_psi, work_arrays, J1_PER_G, J2_PER_G, J4_PER_H4, NOBS)
+from sbaniso.rng import make_streams
 
 RNG = np.random.default_rng(0)
 
@@ -62,29 +63,29 @@ def test_decoupled_limits_are_exact():
 
 def test_sigma_psi_cluster_preserves_psi():
     L = 10; c = couplings_from_r(4.1); s, p = new_state(L, RNG); stack, inc, mem = work_arrays(L)
-    seed(3)
+    st = make_streams(3, 1)[0]
     for _ in range(20):
         psi0 = np.exp(1j * p) * s
-        wolff_sigma_psi(s, p, L, 1 / 7.0, c, stack, inc, mem)
+        wolff_sigma_psi(s, p, L, 1 / 7.0, c, stack, inc, mem, st)
         assert np.allclose(np.exp(1j * p) * s, psi0)
         assert not inc.any()
 
 
 def test_phi_cluster_preserves_sigma_and_sigma_phi_preserves_phi():
     L = 10; c = couplings_from_r(4.1); s, p = new_state(L, RNG); stack, inc, mem = work_arrays(L)
-    seed(4)
-    s0 = s.copy(); wolff_phi(s, p, L, 1 / 7.0, c, stack, inc, mem); assert (s == s0).all()
-    p0 = p.copy(); wolff_sigma_phi(s, p, L, 1 / 7.0, c, stack, inc, mem); assert np.allclose(p, p0)
+    st = make_streams(4, 1)[0]
+    s0 = s.copy(); wolff_phi(s, p, L, 1 / 7.0, c, stack, inc, mem, st); assert (s == s0).all()
+    p0 = p.copy(); wolff_sigma_phi(s, p, L, 1 / 7.0, c, stack, inc, mem, st); assert np.allclose(p, p0)
 
 
 def _series(flags, c, L, T, n, nskip, sd):
     s, p = new_state(L, np.random.default_rng(sd)); stack, inc, mem = work_arrays(L)
-    seed(sd); o = np.zeros(NOBS); xs = []
+    st = make_streams(sd, 1)[0]; o = np.zeros(NOBS); xs = []
     for it in range(n + nskip):
         if flags is None:
-            sweep(s, p, L, 1 / T, c, 1.0)
+            sweep(s, p, L, 1 / T, c, 1.0, st)
         else:
-            full_step(s, p, L, 1 / T, c, 1.0, stack, inc, mem, np.array(flags, dtype=np.int64), np.zeros(3))
+            full_step(s, p, L, 1 / T, c, 1.0, stack, inc, mem, np.array(flags, dtype=np.int64), np.zeros(3), st)
         if it >= nskip:
             measure(s, p, L, c, o); xs.append([o[0] / L ** 2, (o[1] / L ** 2) ** 2, (o[8] ** 2 + o[9] ** 2) / L ** 4])
     xs = np.array(xs); nb = 40
