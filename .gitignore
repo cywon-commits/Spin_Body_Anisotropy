@@ -3,3 +3,4 @@ __pycache__/
 .pytest_cache/
 *.ckpt.npz
 /runs/
+.DS_Store

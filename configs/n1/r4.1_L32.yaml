@@ -1,0 +1,18 @@
+name: n1_r4.1_L32
+model:
+  r: 4.1
+L: 32
+temperatures:
+  Tmin: 6.2
+  Tmax: 8.0
+  n: 14
+ntherm: 1000
+nmeas: 20000
+clusters:
+- 1
+- 1
+- 1
+seed: 10013
+start: random
+checkpoint_every: 1000
+output: runs/n1/r4.1_L32.h5

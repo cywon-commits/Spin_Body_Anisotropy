@@ -11,7 +11,8 @@
      is tuned during the first half of equilibration and then frozen.
   2. Always include the psi-frame sigma cluster (`wolff_sigma_psi`) for the C3 effective model.
   3. Equilibration: quarter-split averages agree within errors, random and ordered starts agree,
-     >= 20 PT round trips. Report tau_int for every temperature used in a fit.
+     >= 20 full PT round trips (bottom -> top -> bottom), swap acceptance >= 0.2 per attempt for every
+     neighbour pair. Report tau_int for every temperature used in a fit.
 - Decision rules in `docs/TASK.md` are fixed before looking at production data. If a result needs a
   rule change, write the reason in the report before rerunning the analysis.
 - Grade every claim in reports: [proved] analytic, [numerical] checked with errors, [conjecture].

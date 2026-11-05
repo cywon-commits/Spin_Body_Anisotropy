@@ -20,4 +20,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: multi-minute statistical tests"]
+markers = [
+    "slow: multi-minute statistical tests",
+    "validation: N0 physics gates (need data/n0/validation_summary.json)",
+]

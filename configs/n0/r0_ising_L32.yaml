@@ -1,0 +1,21 @@
+name: n0_r0_ising_L32
+model:
+  couplings:
+  - 1.9753086419753085
+  - 1.5802469135802468
+  - 0.0
+L: 32
+temperatures:
+  Tmin: 4.306172839506173
+  Tmax: 4.661728395061728
+  n: 14
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 3101
+start: random
+checkpoint_every: 2000
+output: runs/n0/r0_ising_L32.h5
