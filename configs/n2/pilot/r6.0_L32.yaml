@@ -1,0 +1,18 @@
+name: n2_pilot_r6.0_L32
+model:
+  r: 6.0
+L: 32
+temperatures:
+  Tmin: 6.8
+  Tmax: 9.9
+  n: 48
+ntherm: 1000
+nmeas: 5000
+clusters:
+- 1
+- 1
+- 1
+seed: 30002
+start: random
+checkpoint_every: 2000
+output: runs/n2/pilot_r6.0_L32.h5
