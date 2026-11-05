@@ -277,23 +277,35 @@ def _interp_at(T, y, t):
     return np.interp(t, T, y) if np.isfinite(t) else np.nan
 
 
-def binder_crossing(T, cur1, cur2, window=(0.25, 0.66)):
-    """Crossing of U4 for two sizes, restricted to U4 of the smaller L inside `window` (excludes
-    the trivial low-T crossing at U4 -> 2/3).  cur = (values, errors, pseudo) from curves().
-    Returns dict(T, dT, U, dU) with errors from the two independent jackknifes in quadrature."""
+def binder_crossing(T, cur1, cur2, window=(0.25, 0.66), key="U4"):
+    """Crossing of `key` (default U4) for two sizes, restricted to values of the smaller L inside
+    `window` (for U4 this excludes the trivial low-T crossing at U4 -> 2/3).
+    cur = (values, errors, pseudo) from curves().  Returns dict(T, dT, U, dU) (U = value of `key`
+    at the crossing) with errors from the two independent jackknifes in quadrature.
+    Also used for xi/L crossings (xi_crossing)."""
     def one(u1, u2):
         ok = (u1 > window[0]) & (u1 < window[1])
         t = crossing(T, np.where(ok, u1 - u2, np.nan))
         return t, _interp_at(T, u1, t)
-    t0, u0 = one(cur1[0]["U4"], cur2[0]["U4"])
+    t0, u0 = one(cur1[0][key], cur2[0][key])
     var_t = 0.0; var_u = 0.0
-    for reps in ([one(pu, cur2[0]["U4"]) for pu in cur1[2]["U4"]],     # vary L1, hold L2
-                 [one(cur1[0]["U4"], pu) for pu in cur2[2]["U4"]]):    # vary L2, hold L1
+    for reps in ([one(pu, cur2[0][key]) for pu in cur1[2][key]],       # vary L1, hold L2
+                 [one(cur1[0][key], pu) for pu in cur2[2][key]]):      # vary L2, hold L1
         reps = np.array(reps)
         nb = len(reps)
         var_t += (nb - 1) / nb * np.nansum((reps[:, 0] - np.nanmean(reps[:, 0])) ** 2)
         var_u += (nb - 1) / nb * np.nansum((reps[:, 1] - np.nanmean(reps[:, 1])) ** 2)
     return dict(T=t0, dT=np.sqrt(var_t), U=u0, dU=np.sqrt(var_u))
+
+
+XI_L_KT_XY = 0.7507   # xi_2nd/L of the XY model at T_KT, L -> infinity (Hasenbusch 2005)
+
+
+def xi_crossing(T, cur1, cur2, key="xiL_psi", window=(0.3, 1.5)):
+    """Crossing of xi/L (auxiliary KT indicator, docs/N1_analysis_plan.md): T and xi/L at the
+    crossing of two sizes, to be compared with XI_L_KT_XY.  Not a decision rule."""
+    r = binder_crossing(T, cur1, cur2, window=window, key=key)
+    return dict(T=r["T"], dT=r["dT"], xiL=r["U"], dxiL=r["dU"])
 
 
 def ups_crossing(T, cur):
@@ -424,6 +436,32 @@ def tau_table(run, names=("E", "absm", "m2", "Mpsi2")):
                   Mpsi2=obs[..., 8] ** 2 + obs[..., 9] ** 2, Mphi2=obs[..., 6] ** 2 + obs[..., 7] ** 2,
                   cxy=obs[..., 2] + obs[..., 4])
     return {k: np.array([tau_int(series[k][r])[0] for r in range(len(run.Ts))]) for k in names}
+
+
+def equilibration_check(run, nb=NB, min_blocks_per_tau=10, min_roundtrips=20, min_swap=0.2):
+    """Combined equilibration criterion (CLAUDE.md MC rule 3; docs/N0_report.md, appendix).
+    A run passes only if ALL hold:
+      quarter      quarter_check z_max below its Bonferroni threshold
+      tau          every jackknife block spans >= min_blocks_per_tau tau_int, i.e.
+                   tau_int <= n / (nb * min_blocks_per_tau) for E, |m|, m^2, |M_psi|^2 at every T.
+                   Without this the block errors absorb a slow drift and the quarter test loses
+                   its power (negative control: tau = 893 sweeps, quarter z = 4.22 = threshold)
+      roundtrips   full PT round trips >= min_roundtrips
+      swap         per-attempt swap acceptance >= min_swap for every neighbour pair
+    Returns dict(pass, reasons, quarter_z, quarter_threshold, tau_max, tau_limit, roundtrips,
+    swap_min)."""
+    z, d = quarter_check(run, nb=nb)
+    tau = tau_table(run)
+    tau_max = max(float(v.max()) for v in tau.values())
+    tau_limit = run.obs.shape[1] / (nb * min_blocks_per_tau)
+    diag = run.diagnostics
+    rt = int(diag.get("roundtrips", -1)); sw = float(np.min(diag["swap_acc"])) if "swap_acc" in diag else np.nan
+    checks = dict(quarter=bool(z.max() < d["threshold"]), tau=bool(tau_max <= tau_limit),
+                  roundtrips=bool(rt >= min_roundtrips), swap=bool(np.isfinite(sw) and sw >= min_swap))
+    return dict(**{"pass": all(checks.values())}, checks=checks,
+                reasons=[k for k, v in checks.items() if not v], quarter_z=float(z.max()),
+                quarter_threshold=d["threshold"], tau_max=tau_max, tau_limit=tau_limit,
+                roundtrips=rt, swap_min=sw)
 
 
 def bimodality(E, bins=40):

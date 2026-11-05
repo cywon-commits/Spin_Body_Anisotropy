@@ -55,6 +55,8 @@ def test_pilot_regression(S, key):
 def test_equilibration_diagnostics(S):
     diags = [d for k, v in S.items() if k != "regression" for d in v["diagnostics"]]
     diags += [v["diagnostics"] for v in S["regression"].values()]
-    for d in diags:
+    for d in diags:   # combined criterion of analysis.equilibration_check
         assert d["roundtrips"] >= 20, d
+        assert d["swap_acc_min"] >= 0.2, d
         assert d["quarter_z_max"] < d["quarter_threshold"], d   # Bonferroni, p = 0.01 per run
+        assert max(d["tau_max"].values()) <= d["nmeas"] / 200, d     # 20 blocks of >= 10 tau
