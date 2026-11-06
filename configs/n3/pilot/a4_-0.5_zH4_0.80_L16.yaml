@@ -1,0 +1,19 @@
+name: n3_pilot_a4_-0.5_zH4_0.80_L16
+model:
+  J: 1.0
+  K: 2.0
+  zG: 0.08
+  zH4: 0.8
+  a2: 0.0
+  a4: -0.5
+L: 16
+temperatures:
+  Tmin: 0.09
+  Tmax: 0.19
+  n: 20
+ntherm: 3000
+nmeas: 8000
+seed: 61004
+start: random
+checkpoint_every: 1000
+output: runs/n3/pilot_a4_-0.5_zH4_0.80_L16.h5

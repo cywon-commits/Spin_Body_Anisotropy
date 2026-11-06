@@ -1,0 +1,21 @@
+name: n3_eff_zH4_0.72_L16
+model:
+  couplings:
+  - 0.03842
+  - 0.03306
+  - 0.12154
+L: 16
+temperatures:
+  Tmin: 0.112
+  Tmax: 0.17
+  n: 16
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 50000
+start: random
+checkpoint_every: 2000
+output: runs/n3/eff_zH4_0.72_L16.h5

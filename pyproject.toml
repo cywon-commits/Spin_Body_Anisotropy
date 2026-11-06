@@ -12,8 +12,9 @@ dependencies = ["numpy", "scipy", "numba", "matplotlib", "pyyaml", "h5py"]
 [project.optional-dependencies]
 test = ["pytest"]
 # Full spin-body model (task T2): polyspin with the anisotropy extension, pinned to a tag.
-# Fill in the tag after the anisotropy branch of Polyhedron_Spin_Group is merged and tagged.
-fullmodel = ["polyspin @ git+https://github.com/cywon-commits/Polyhedron_Spin_Group@TAG_TO_FILL"]
+# Tag v0.2.0-aniso on branch anisotropy-extension of Polyhedron_Spin_Group (not merged into Paper I's
+# default branch, per CLAUDE.md).
+fullmodel = ["polyspin @ git+https://github.com/cywon-commits/Polyhedron_Spin_Group@v0.2.0-aniso"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
