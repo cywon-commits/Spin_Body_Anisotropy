@@ -1,0 +1,19 @@
+name: n3s_pilot_s0.03_L16
+model:
+  J: 1.0
+  K: 2.0
+  zG: 0.0024
+  zH4: 0.024
+  a2: 0.0
+  a4: -0.02
+L: 16
+temperatures:
+  Tmin: 0.0018017
+  Tmax: 0.0048046
+  n: 28
+ntherm: 3000
+nmeas: 8000
+seed: 81002
+start: random
+checkpoint_every: 1000
+output: runs/n3s/pilot_s0.03_L16.h5

@@ -1,0 +1,14 @@
+configs/n3s/full/s0.03_L24_ordered.yaml
+configs/n3s/full/s0.03_L24_random.yaml
+configs/n3s/full/s0.1_L24_ordered.yaml
+configs/n3s/full/s0.1_L24_random.yaml
+configs/n3s/full/s0.3_L24_ordered.yaml
+configs/n3s/full/s0.3_L24_random.yaml
+configs/n3s/full/s1.0_L24_ordered.yaml
+configs/n3s/full/s0.03_L16_ordered.yaml
+configs/n3s/full/s0.03_L16_random.yaml
+configs/n3s/full/s0.1_L16_ordered.yaml
+configs/n3s/full/s0.1_L16_random.yaml
+configs/n3s/full/s0.3_L16_ordered.yaml
+configs/n3s/full/s0.3_L16_random.yaml
+configs/n3s/full/s1.0_L16_ordered.yaml
