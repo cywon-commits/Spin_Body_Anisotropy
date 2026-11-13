@@ -1,0 +1,21 @@
+name: n3d_eff_s0.1_L16
+model:
+  couplings:
+  - 0.0029085929917018983
+  - 0.0029705304927121947
+  - 0.010631735785192251
+L: 16
+temperatures:
+  Tmin: 0.009376
+  Tmax: 0.014064
+  n: 16
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 91020
+start: random
+checkpoint_every: 2000
+output: runs/n3d/eff_s0.1_L16.h5
