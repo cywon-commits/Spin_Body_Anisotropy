@@ -37,10 +37,24 @@ runs/                         HDF5 output (not in git: ~0.1 GB per large run)
 data/n0/                      N0 validation summary (JSON)
 data/pilot_v3/                pilot data (r = 3.8, 4.1, 4.4; L = 32, 48, 64) and summary
 docs/TASK.md                  work order for Claude Code (Korean)
-docs/theory_summary.md        predictions P1-P10 and the formulas they come from
+docs/theory_summary.md        predictions P1-P11 and the formulas they come from
+docs/RESULTS_SUMMARY.md       N0-N3f key numbers with evidence grades, linked to P1-P11 (manuscript input)
+docs/N*_report.md             stage reports (Korean)
 docs/pilot_report.md          pilot results and the two algorithm lessons
 docs/note/                    derivation note (TeX + PDF)
 reference/                    exploratory scripts used in chat (two-body relaxation, T=0 window scan)
+```
+
+## Figures
+Manuscript figures (single column, 3.4 in; style in `scripts/figstyle.py`; each script reads only repository
+data and writes `figures/<name>.pdf` and `.png`). Captions: `docs/RESULTS_SUMMARY.md`, section 3.
+```
+python scripts/fig1_model.py                # Fig. 1 model and symmetry schematic (geometry only)
+python scripts/n4_gamma_check.py            # data for Fig. 2 -> data/n4/gamma_check.json (needs polyspin v0.2.0-aniso)
+python scripts/fig2_axis_selection.py       # Fig. 2 axis selection: Gamma, kappa-space boundary, single-body check
+python scripts/fig3_phase_diagram.py        # Fig. 3 T-r phase diagram (N1, N2) with the decoupling approximation
+python scripts/fig4_crossing_collapse.py    # Fig. 4 Binder / Upsilon collapse and C_max vs ln L at r = 4.2, 4.4
+python scripts/fig5_debye_waller.py         # Fig. 5 R = T_Ups^full / T_eff vs l_Gamma, three prescriptions
 ```
 
 ## Conventions
