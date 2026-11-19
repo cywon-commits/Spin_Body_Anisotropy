@@ -11,14 +11,14 @@ from polyspin.stiffness import twisted_inter_energy  # noqa: E402
 from scipy.spatial.transform import Rotation as Rot  # noqa: E402
 
 from sbaniso.c3model import NOBS  # noqa: E402
-from sbaniso.fullmodel import NEXTRA, _norms, measure_all  # noqa: E402
+from sbaniso.fullmodel import NBETA, NEXTRA, _norms, measure_all  # noqa: E402
 
 
 def _measure(spins_lat, P, L):
     lat = Lattice(2, L)
     out = np.zeros((1, NOBS)); ext = np.zeros((1, NEXTRA))
     measure_all(spins_lat[None], np.array([0]), np.array([1.234]), lat.nbr, P.array(), L,
-                np.array(_norms()), out, ext)
+                np.array(_norms()), out, ext, True, np.zeros((1, NBETA)))
     return out[0], ext[0]
 
 
@@ -31,6 +31,7 @@ def test_uniform_c3_state():
     assert np.isclose(np.hypot(o[6], o[7]), N) and np.isclose(np.hypot(o[8], o[9]), N)
     assert np.isclose(x[0], 1 / 3) and np.isclose(x[1], 1.0)     # K = 1/3 (C3 along z)
     assert np.isclose(o[10], 0, atol=1e-9) and np.isclose(o[0], 1.234)
+    assert np.allclose(x[2:6], [0.0, 1.0, 1.0, 1.0], atol=1e-8) and abs(x[6]) < 1e-8   # no tilt: factors 1
 
 
 def test_sigma_and_phase_relations():
@@ -71,7 +72,7 @@ def test_stiffness_matches_finite_twist():
 
 
 # ----------------------------------------------------------------------------- C3-axis tilt (N3e)
-from sbaniso.fullmodel import _V, _VM, c3_tilt2  # noqa: E402
+from sbaniso.fullmodel import _V, _VM, bond_factors, c3_axis, c3_tilt2  # noqa: E402
 
 
 def _gs(s):
@@ -116,3 +117,43 @@ def test_tilt_folds_back_beyond_half_axis_angle():
         R = Rot.random(random_state=rng)
         th2 = c3_tilt2(np.ascontiguousarray(R.apply(S)), _V, _VM)
         assert th2 <= 2 / 3 + 1e-9
+
+
+
+# ----------------------------------------------------------------------------- relative tilt (N3f)
+def test_bond_factors_small_beta_expansions():
+    """1 - d(beta) = c beta^2 + O(beta^4) with c = 3 (J1), 0.75 (J2), 2.75 (J4), i.e. 1/2[l(l+1) - m^2]/2."""
+    for beta in (1e-2, 3e-3):
+        f = np.array(bond_factors(np.cos(beta)))
+        assert np.allclose((1 - f) / beta ** 2, [3.0, 0.75, 2.75], rtol=1e-3)
+    assert np.allclose(bond_factors(1.0), (1.0, 1.0, 1.0))
+
+
+def test_bond_factors_are_wigner_d():
+    """Compare with Wigner small-d computed from the explicit sum (independent implementation)."""
+    from math import comb, factorial
+    def d(l, m, b):
+        tot = 0.0
+        for k in range(0, 2 * l + 1):
+            if l + m - k < 0 or l - m - k < 0 or k - m + m < 0:
+                continue
+            num = (-1) ** k * np.sqrt(float(factorial(l + m) * factorial(l - m) * factorial(l + m) * factorial(l - m)))
+            den = factorial(l + m - k) * factorial(k) * factorial(l - m - k) * factorial(k)
+            tot += num / den * np.cos(b / 2) ** (2 * l - 2 * k) * np.sin(b / 2) ** (2 * k)
+        return tot
+    for b in (0.1, 0.7, 1.9, 2.8):
+        assert np.allclose(bond_factors(np.cos(b)), (d(3, 0, b), d(3, 3, b), d(4, 3, b)), atol=1e-12)
+
+
+def test_common_tilt_gives_no_reduction_and_axis_points_up():
+    """Two bodies tilted together (common rotation) have beta = 0: all bond factors 1, theta_a.theta_b =
+    theta^2 (C_nn = 1); a flipped body (sigma -> -sigma) still gives an axis with c_z > 0."""
+    S = _gs(1.0)
+    R = Rot.from_rotvec([0.25, 0.1, 0.0])
+    ca = np.zeros(3); cb = np.zeros(3)
+    c3_axis(np.ascontiguousarray(R.apply(S)), _V, _VM, ca)
+    c3_axis(np.ascontiguousarray(R.apply(Rot.from_rotvec([0, 0, 1.3]).apply(S))), _V, _VM, cb)
+    assert ca[2] > 0 and np.allclose(bond_factors(ca @ cb), (1, 1, 1))
+    cf = np.zeros(3)
+    c3_axis(np.ascontiguousarray(Rot.from_rotvec([np.pi, 0, 0]).apply(S)), _V, _VM, cf)
+    assert cf[2] > 0.999

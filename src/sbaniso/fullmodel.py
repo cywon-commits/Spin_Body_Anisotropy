@@ -42,7 +42,8 @@ from polyspin.stiffness import _bond_sums
 from .c3model import NOBS, OBS_NAMES
 from .run import REPO, git_hash, src_digest
 
-NEXTRA = 3
+NEXTRA = 7        # K, |q30|, theta2, <d3_00(beta)>, <d3_33(beta)>, <d4_33(beta)>, <theta_a . theta_b> (bonds)
+NBETA = 90        # beta histogram bins on [0, pi]
 TILT_EVERY = 10   # theta2 (Kabsch fit, ~8x the other measurements) every 10th sweep; NaN otherwise
 _V = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], float) / np.sqrt(3.0)
 _VM = _V[np.array([0, 2, 1, 3])].copy()   # mirror labelling (two labels swapped)
@@ -56,11 +57,11 @@ def _norms():
 
 
 @njit(cache=True)
-def c3_tilt2(S, V, VM):
-    """theta^2 = 1 - (c3 . z)^2 of one body (n = 4 spins S).  The ideal tetrahedron V is fitted to S by the
-    best proper rotation (Kabsch; label chirality chosen by the sign of det sum_i S_i V_i^T), and c3 is the fitted vertex
-    direction closest to the lab z axis.  A C3v-symmetric deformation (apex on the axis, three equivalent
-    base spins) leaves the fit axis on z, so static deformation contributes nothing."""
+def c3_axis(S, V, VM, out):
+    """Unit C3 axis c3 of one body (n = 4 spins S), oriented towards +z, written to out (3,).  The ideal
+    tetrahedron V is fitted to S by the best proper rotation (Kabsch; label chirality chosen by the sign
+    of det sum_i S_i V_i^T); c3 is the fitted vertex direction closest to the lab z axis.  A C3v-symmetric
+    deformation (apex on the axis, three equivalent base spins) leaves it on z."""
     M = np.zeros((3, 3))
     for i in range(4):
         for a in range(3):
@@ -79,17 +80,33 @@ def c3_tilt2(S, V, VM):
     if np.linalg.det(U @ Wt) < 0:
         D[2, 2] = -1.0
     R = U @ D @ Wt                                   # proper rotation with R ref_i ~ S_i
-    czmax = 0.0
+    czmax = -1.0
     for i in range(4):
         rv = R @ ref[i]
         if abs(rv[2]) > czmax:
             czmax = abs(rv[2])
-    th2 = 1.0 - czmax * czmax
-    return th2
+            sg = 1.0 if rv[2] >= 0 else -1.0
+            out[0] = sg * rv[0]; out[1] = sg * rv[1]; out[2] = sg * rv[2]
 
 
 @njit(cache=True)
-def _measure_one(spins, L, nrm, out, extra, do_tilt):
+def c3_tilt2(S, V, VM):
+    """theta^2 = 1 - (c3 . z)^2 of one body (see c3_axis)."""
+    c = np.zeros(3)
+    c3_axis(S, V, VM, c)
+    return 1.0 - c[2] * c[2]
+
+
+@njit(cache=True)
+def bond_factors(cb):
+    """Exact Debye-Waller factors of a bond with relative C3-axis tilt beta (cb = cos beta):
+    d^3_00 = P3(cos beta) (J1), d^3_33 = cos^6(beta/2) (J2), d^4_33 = cos^6(beta/2)(4 cos beta - 3) (J4)."""
+    h3 = (0.5 * (1.0 + cb)) ** 3
+    return 0.5 * (5.0 * cb * cb * cb - 3.0 * cb), h3, h3 * (4.0 * cb - 3.0)
+
+
+@njit(cache=True)
+def _measure_one(spins, L, nrm, out, extra, do_tilt, nbr, axes, hist):
     N, n, _ = spins.shape
     m = 0.0; fr = 0.0; fi = 0.0; sr = 0.0; si = 0.0; kk = 0.0; aq = 0.0; tt = 0.0
     k = 2.0 * np.pi / L
@@ -106,7 +123,8 @@ def _measure_one(spins, L, nrm, out, extra, do_tilt):
             q43 += c * w3
         q30 /= nrm[0]; q33 /= nrm[1]; q43 /= nrm[2]
         if do_tilt:
-            tt += c3_tilt2(spins[a], _V, _VM)
+            c3_axis(spins[a], _V, _VM, axes[a])
+            tt += 1.0 - axes[a, 2] * axes[a, 2]
         Ka = 0.0
         for al in range(1, 4):
             ex = spins[a, 0, 0] + spins[a, al, 0]; ey = spins[a, 0, 1] + spins[a, al, 1]
@@ -125,17 +143,37 @@ def _measure_one(spins, L, nrm, out, extra, do_tilt):
     out[10] = 0.5 * (abs(ax_s) ** 2 + abs(ay_s) ** 2)
     out[11] = 0.5 * (abs(ax_1) ** 2 + abs(ay_1) ** 2)
     out[12] = 0.5 * (abs(ax_2) ** 2 + abs(ay_2) ** 2)
-    extra[0] = kk / N; extra[1] = aq / N; extra[2] = tt / N if do_tilt else np.nan
+    extra[0] = kk / N; extra[1] = aq / N
+    if do_tilt:
+        f1 = 0.0; f2 = 0.0; f4 = 0.0; tn = 0.0
+        for a in range(N):
+            for col in range(2):
+                b = nbr[a, col]
+                cb = axes[a, 0] * axes[b, 0] + axes[a, 1] * axes[b, 1] + axes[a, 2] * axes[b, 2]
+                cb = min(1.0, max(-1.0, cb))
+                g1, g2, g4 = bond_factors(cb)
+                f1 += g1; f2 += g2; f4 += g4
+                tn += axes[a, 0] * axes[b, 0] + axes[a, 1] * axes[b, 1]
+                k_ = int(np.arccos(cb) / np.pi * hist.shape[0])
+                hist[min(k_, hist.shape[0] - 1)] += 1.0
+        nb = 2.0 * N
+        extra[2] = tt / N; extra[3] = f1 / nb; extra[4] = f2 / nb; extra[5] = f4 / nb; extra[6] = tn / nb
+    else:
+        for q in range(2, 7):
+            extra[q] = np.nan
 
 
 @njit(parallel=True, cache=True)
-def measure_all(spins_all, rep_at, energies, nbr, p, L, nrm, out, extra, do_tilt=True):
-    """out[t] / extra[t] (K, |q30|, theta2) for the replica at temperature index t."""
+def measure_all(spins_all, rep_at, energies, nbr, p, L, nrm, out, extra, do_tilt, hist):
+    """out[t] / extra[t] (see NEXTRA) for the replica at temperature index t; hist[t] accumulates the
+    histogram of the relative C3-axis tilt beta over all bonds (when do_tilt)."""
     R = rep_at.shape[0]
+    N = spins_all.shape[1]
     zax = np.array([0.0, 0.0, 1.0])
     for t in prange(R):
         r = rep_at[t]
-        _measure_one(spins_all[r], L, nrm, out[t], extra[t], do_tilt)
+        axes = np.zeros((N, 3))
+        _measure_one(spins_all[r], L, nrm, out[t], extra[t], do_tilt, nbr, axes, hist[t])
         s1x, s2x = _bond_sums(spins_all[r], nbr, p[3], p[4], p[5], zax, 0)
         s1y, s2y = _bond_sums(spins_all[r], nbr, p[3], p[4], p[5], zax, 1)
         out[t, 0] = energies[r]
@@ -183,6 +221,7 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
     R = len(Ts); ntherm = int(cfg["ntherm"]); nmeas = int(cfg["nmeas"]); total = ntherm + nmeas
     nrm = np.array(_norms())
     secs = 0.0
+    hist = np.zeros((R, NBETA))
     if out_path.exists():
         with h5py.File(out_path, "r") as f:
             if f.attrs["config"] != text:
@@ -193,6 +232,8 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
                 return out_path
             pt.load_state_dict({k: f["checkpoint"][k][()] for k in f["checkpoint"]})
             secs = float(f.attrs["seconds"])
+            if "checkpoint_beta_hist" in f:
+                hist[...] = f["checkpoint_beta_hist"][()]
         with h5py.File(out_path, "r+") as f:
             ds = f["timeseries/obs"]; nrows = max(0, pt.sweeps_done - ntherm)
             ds.resize(nrows, axis=1); f["timeseries/extra"].resize(nrows, axis=1)
@@ -204,7 +245,9 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
             g = f.create_group("params")
             g["Ts"] = Ts; g["betas"] = 1 / Ts; g["couplings"] = P.array(); g["L"] = lat.size
             g["ntherm"] = ntherm; g["nmeas"] = nmeas; g["seed"] = int(cfg["seed"])
-            g["obs_names"] = np.array(OBS_NAMES, dtype="S"); g["extra_names"] = np.array(["K", "abs_q30", "theta2_c3"], dtype="S")
+            g["obs_names"] = np.array(OBS_NAMES, dtype="S"); g["extra_names"] = np.array(["K", "abs_q30", "theta2_c3", "d3_00_bond", "d3_33_bond",
+                                                                             "d4_33_bond", "theta_a_theta_b_bond"], dtype="S")
+            g["beta_hist_edges"] = np.linspace(0.0, np.pi, NBETA + 1)
             ts = f.create_group("timeseries")
             ts.create_dataset("obs", shape=(R, 0, NOBS), maxshape=(R, nmeas, NOBS), dtype="f8",
                               chunks=(1, min(nmeas, 4096), NOBS))
@@ -232,7 +275,7 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
                     pt.round_trips = 0
             else:
                 measure_all(pt.spins, pt.rep_at, pt.energies, pt.nbr, pt.p, lat.size, nrm, obs, ext,
-                            (it - ntherm) % TILT_EVERY == 0)
+                            (it - ntherm) % TILT_EVERY == 0, hist)
                 rows.append(obs.copy()); rows_x.append(ext.copy())
         secs += time.time() - t0
         with h5py.File(out_path, "r+") as f:
@@ -245,6 +288,9 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
                 if k in ck:
                     del ck[k]
                 ck[k] = v
+            if "checkpoint_beta_hist" in f:
+                del f["checkpoint_beta_hist"]
+            f["checkpoint_beta_hist"] = hist          # per temperature index, all measured bonds so far
             dg = f.require_group("diagnostics")
             for k, v in dict(swap_acc=pt.swap_rates(), roundtrips=int(pt.round_trips), seconds=secs,
                              delta=pt.delta, delta_r=pt.delta_r, acceptance=pt.acceptance()).items():
