@@ -1,0 +1,21 @@
+name: n3e_eff_s1.0_L64
+model:
+  couplings:
+  - 0.015936749951301593
+  - 0.02836089004182794
+  - 0.06249868529966999
+L: 64
+temperatures:
+  Tmin: 0.06245459
+  Tmax: 0.09368189
+  n: 40
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 94003
+start: random
+checkpoint_every: 2000
+output: runs/n3e/eff_s1.0_L64.h5
