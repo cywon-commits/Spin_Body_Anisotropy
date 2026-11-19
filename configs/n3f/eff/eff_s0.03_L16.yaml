@@ -1,0 +1,21 @@
+name: n3f_eff_s0.03_L16
+model:
+  couplings:
+  - 0.0010270010251242669
+  - 0.0009169790897878453
+  - 0.0036954869176782272
+L: 16
+temperatures:
+  Tmin: 0.00318159
+  Tmax: 0.00477239
+  n: 16
+ntherm: 2000
+nmeas: 40000
+clusters:
+- 1
+- 1
+- 1
+seed: 96010
+start: random
+checkpoint_every: 2000
+output: runs/n3f/eff_s0.03_L16.h5

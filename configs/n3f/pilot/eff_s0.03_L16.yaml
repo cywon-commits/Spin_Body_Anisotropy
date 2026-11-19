@@ -1,0 +1,21 @@
+name: n3f_pilot_eff_s0.03_L16
+model:
+  couplings:
+  - 0.0010270010251242669
+  - 0.0009169790897878453
+  - 0.0036954869176782272
+L: 16
+temperatures:
+  Tmin: 0.00183843
+  Tmax: 0.0051476
+  n: 24
+ntherm: 2000
+nmeas: 8000
+clusters:
+- 1
+- 1
+- 1
+seed: 95001
+start: random
+checkpoint_every: 5000
+output: runs/n3f/pilot_eff_s0.03_L16.h5
