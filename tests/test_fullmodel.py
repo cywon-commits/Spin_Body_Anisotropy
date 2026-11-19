@@ -68,3 +68,51 @@ def test_stiffness_matches_finite_twist():
     e = [twisted_inter_energy(S, lat.nbr, p, z, d, 0) for d in (-h, 0.0, h)]
     d2 = (e[0] - 2 * e[1] + e[2]) / h ** 2; d1 = (e[2] - e[0]) / (2 * h)
     assert np.isclose(o[2] * 9, d2, rtol=1e-5) and np.isclose(o[3] * 3, d1, rtol=1e-5, atol=1e-9)
+
+
+# ----------------------------------------------------------------------------- C3-axis tilt (N3e)
+from sbaniso.fullmodel import _V, _VM, c3_tilt2  # noqa: E402
+
+
+def _gs(s):
+    from polyspin.groundstate import find_ground_state
+    return find_ground_state(Params.from_z(zG=0.08 * s, zH4=0.80 * s, K=2.0, a4=-0.02))[1]
+
+
+@pytest.mark.parametrize("s", [1.0, 0.03])
+def test_tilt_zero_for_statically_deformed_ground_state(s):
+    """The T = 0 body is deformed by the anisotropy (K = sum n^4 gives 0.324-0.340, not 1/3);
+    the Kabsch-fit tilt must still be zero."""
+    S = _gs(s)
+    assert c3_tilt2(S, _V, _VM) < 1e-8
+
+
+@pytest.mark.parametrize("theta", [0.05, 0.2, 0.4, 0.6])
+def test_tilt_reproduces_rigid_rotation(theta):
+    """Unambiguous up to ~35 deg (0.615 rad): beyond that another C3 axis is closer to z."""
+    rng = np.random.default_rng(7)
+    S = _gs(1.0)
+    for _ in range(5):
+        phi = rng.uniform(0, 2 * np.pi)
+        R = Rot.from_rotvec(theta * np.array([np.cos(phi), np.sin(phi), 0.0]))
+        assert np.isclose(c3_tilt2(R.apply(S), _V, _VM), np.sin(theta) ** 2, atol=1e-8)
+
+
+def test_tilt_independent_of_labels_and_spin_about_z():
+    rng = np.random.default_rng(3)
+    S = Rot.from_rotvec([0.3, -0.1, 0.0]).apply(_gs(0.03))
+    ref = c3_tilt2(S, _V, _VM)
+    for _ in range(10):
+        S2 = Rot.from_rotvec([0, 0, rng.uniform(0, 6)]).apply(S)[rng.permutation(4)]
+        assert np.isclose(c3_tilt2(np.ascontiguousarray(S2), _V, _VM), ref, atol=1e-10)
+
+
+def test_tilt_folds_back_beyond_half_axis_angle():
+    """C3 axis lines are arccos(1/3) = 70.53 deg apart and the nearest one to z is reported, so theta^2
+    is bounded by its value with z along an S4 axis, 1 - 1/3 = 2/3 (large tilts are folded back)."""
+    rng = np.random.default_rng(5)
+    S = _gs(1.0)
+    for _ in range(50):
+        R = Rot.random(random_state=rng)
+        th2 = c3_tilt2(np.ascontiguousarray(R.apply(S)), _V, _VM)
+        assert th2 <= 2 / 3 + 1e-9

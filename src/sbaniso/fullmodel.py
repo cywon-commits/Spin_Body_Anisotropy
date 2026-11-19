@@ -8,7 +8,10 @@ Per body a (spins S_ai, lab axis z), with c = z.S and w = (x + i y).S:
     q33_a = sum_i w^3              e^{i phi}   (octupole phase)
     q43_a = sum_i c w^3            e^{i psi}   (hexadecapole phase, TR even)
     K_a   = sum_alpha n_alpha^4    axis selection (1/3: C3 along z, 1: S4 along z); body S4 axes
-                                   e_alpha ~ S_0 + S_alpha
+                                   e_alpha ~ S_0 + S_alpha (not orthonormal for deformed bodies: K_a then
+                                   contains static deformation, e.g. K_0 = 0.324 < 1/3)
+    theta2_a = 1 - (c3 . z)^2      C3-axis tilt from a Kabsch fit of the ideal tetrahedron (c3_tilt2);
+                                   zero for any C3v-symmetric static deformation
 each normalised by its value for an ideal tetrahedron with a C3 axis along z (|q| = 1).
 Stiffness for a uniform twist of the body angle alpha about z: rho_alpha = [<S2> - beta <S1^2>] / N per
 bond direction (polyspin.stiffness, exact also with the anisotropy, which is invariant under rotations
@@ -18,7 +21,7 @@ rho_alpha = 18 T/pi (docs/TASK.md N3).
 Stored columns (same layout as sbaniso.c3model.OBS_NAMES):
     E (total energy, J units), m_sigma = sum q30, cx = S2_x/9, sx = S1_x/3, cy = S2_y/9, sy = S1_y/3,
     Re/Im sum q33, Re/Im sum q43, |F(k_min)|^2 of q30, q33, q43
-so that analysis.derived gives U4 (sigma Binder), Ups = rho_psi, xi/L, etc.  Extra: K (mean K_a) and
+so that analysis.derived gives U4 (sigma Binder), Ups = rho_psi, xi/L, etc.  Extra: K (mean K_a), theta2 (mean c3 tilt) and
 the mean |q30| per body are stored in timeseries/extra.
 
 YAML: name, model {J, K, zG, zH4, a2, a4}, L, temperatures {Tmin, Tmax, n} | {list}, ntherm, nmeas,
@@ -39,7 +42,10 @@ from polyspin.stiffness import _bond_sums
 from .c3model import NOBS, OBS_NAMES
 from .run import REPO, git_hash, src_digest
 
-NEXTRA = 2
+NEXTRA = 3
+TILT_EVERY = 10   # theta2 (Kabsch fit, ~8x the other measurements) every 10th sweep; NaN otherwise
+_V = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], float) / np.sqrt(3.0)
+_VM = _V[np.array([0, 2, 1, 3])].copy()   # mirror labelling (two labels swapped)
 
 
 def _norms():
@@ -50,9 +56,42 @@ def _norms():
 
 
 @njit(cache=True)
-def _measure_one(spins, L, nrm, out, extra):
+def c3_tilt2(S, V, VM):
+    """theta^2 = 1 - (c3 . z)^2 of one body (n = 4 spins S).  The ideal tetrahedron V is fitted to S by the
+    best proper rotation (Kabsch; label chirality chosen by the sign of det sum_i S_i V_i^T), and c3 is the fitted vertex
+    direction closest to the lab z axis.  A C3v-symmetric deformation (apex on the axis, three equivalent
+    base spins) leaves the fit axis on z, so static deformation contributes nothing."""
+    M = np.zeros((3, 3))
+    for i in range(4):
+        for a in range(3):
+            for b in range(3):
+                M[a, b] += S[i, a] * V[i, b]
+    ref = V
+    if np.linalg.det(M) < 0:                         # mirror labelling: use the swapped reference
+        ref = VM
+        M[:, :] = 0.0
+        for i in range(4):
+            for a in range(3):
+                for b in range(3):
+                    M[a, b] += S[i, a] * VM[i, b]
+    U, sv, Wt = np.linalg.svd(M)
+    D = np.eye(3)
+    if np.linalg.det(U @ Wt) < 0:
+        D[2, 2] = -1.0
+    R = U @ D @ Wt                                   # proper rotation with R ref_i ~ S_i
+    czmax = 0.0
+    for i in range(4):
+        rv = R @ ref[i]
+        if abs(rv[2]) > czmax:
+            czmax = abs(rv[2])
+    th2 = 1.0 - czmax * czmax
+    return th2
+
+
+@njit(cache=True)
+def _measure_one(spins, L, nrm, out, extra, do_tilt):
     N, n, _ = spins.shape
-    m = 0.0; fr = 0.0; fi = 0.0; sr = 0.0; si = 0.0; kk = 0.0; aq = 0.0
+    m = 0.0; fr = 0.0; fi = 0.0; sr = 0.0; si = 0.0; kk = 0.0; aq = 0.0; tt = 0.0
     k = 2.0 * np.pi / L
     ax_s = 0.0 + 0.0j; ay_s = 0.0 + 0.0j; ax_1 = 0.0 + 0.0j; ay_1 = 0.0 + 0.0j
     ax_2 = 0.0 + 0.0j; ay_2 = 0.0 + 0.0j
@@ -66,6 +105,8 @@ def _measure_one(spins, L, nrm, out, extra):
             q33 += w3
             q43 += c * w3
         q30 /= nrm[0]; q33 /= nrm[1]; q43 /= nrm[2]
+        if do_tilt:
+            tt += c3_tilt2(spins[a], _V, _VM)
         Ka = 0.0
         for al in range(1, 4):
             ex = spins[a, 0, 0] + spins[a, al, 0]; ey = spins[a, 0, 1] + spins[a, al, 1]
@@ -84,17 +125,17 @@ def _measure_one(spins, L, nrm, out, extra):
     out[10] = 0.5 * (abs(ax_s) ** 2 + abs(ay_s) ** 2)
     out[11] = 0.5 * (abs(ax_1) ** 2 + abs(ay_1) ** 2)
     out[12] = 0.5 * (abs(ax_2) ** 2 + abs(ay_2) ** 2)
-    extra[0] = kk / N; extra[1] = aq / N
+    extra[0] = kk / N; extra[1] = aq / N; extra[2] = tt / N if do_tilt else np.nan
 
 
 @njit(parallel=True, cache=True)
-def measure_all(spins_all, rep_at, energies, nbr, p, L, nrm, out, extra):
-    """out[t] / extra[t] for the replica at temperature index t."""
+def measure_all(spins_all, rep_at, energies, nbr, p, L, nrm, out, extra, do_tilt=True):
+    """out[t] / extra[t] (K, |q30|, theta2) for the replica at temperature index t."""
     R = rep_at.shape[0]
     zax = np.array([0.0, 0.0, 1.0])
     for t in prange(R):
         r = rep_at[t]
-        _measure_one(spins_all[r], L, nrm, out[t], extra[t])
+        _measure_one(spins_all[r], L, nrm, out[t], extra[t], do_tilt)
         s1x, s2x = _bond_sums(spins_all[r], nbr, p[3], p[4], p[5], zax, 0)
         s1y, s2y = _bond_sums(spins_all[r], nbr, p[3], p[4], p[5], zax, 1)
         out[t, 0] = energies[r]
@@ -163,7 +204,7 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
             g = f.create_group("params")
             g["Ts"] = Ts; g["betas"] = 1 / Ts; g["couplings"] = P.array(); g["L"] = lat.size
             g["ntherm"] = ntherm; g["nmeas"] = nmeas; g["seed"] = int(cfg["seed"])
-            g["obs_names"] = np.array(OBS_NAMES, dtype="S"); g["extra_names"] = np.array(["K", "abs_q30"], dtype="S")
+            g["obs_names"] = np.array(OBS_NAMES, dtype="S"); g["extra_names"] = np.array(["K", "abs_q30", "theta2_c3"], dtype="S")
             ts = f.create_group("timeseries")
             ts.create_dataset("obs", shape=(R, 0, NOBS), maxshape=(R, nmeas, NOBS), dtype="f8",
                               chunks=(1, min(nmeas, 4096), NOBS))
@@ -190,7 +231,8 @@ def run_config(config, threads=None, verbose=True, max_sweeps=None):
                     pt.reset_swap_stats(); pt.reset_acceptance()
                     pt.round_trips = 0
             else:
-                measure_all(pt.spins, pt.rep_at, pt.energies, pt.nbr, pt.p, lat.size, nrm, obs, ext)
+                measure_all(pt.spins, pt.rep_at, pt.energies, pt.nbr, pt.p, lat.size, nrm, obs, ext,
+                            (it - ntherm) % TILT_EVERY == 0)
                 rows.append(obs.copy()); rows_x.append(ext.copy())
         secs += time.time() - t0
         with h5py.File(out_path, "r+") as f:
