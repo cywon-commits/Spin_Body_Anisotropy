@@ -1,6 +1,6 @@
 """Fig. 5: the effective model with Debye-Waller-reduced couplings reproduces the full spin-body
-model within 5 % only for l_Gamma < 1; at l_Gamma = 4.5 per-body and relative-tilt prescriptions
-bracket the full-model value.
+model at l_Gamma = 0.77 (central values within 5 %; one point, s = 0.03), while at l_Gamma = 4.5 the
+per-body and relative-tilt prescriptions bracket the full-model value.
 (a) R = T_Ups^full / T_eff vs l_Gamma: bare couplings (N3s), per-body DW factor with the directly
     measured tilt (N3e), exact bond average <d^l_mm(beta_ab)> of the relative tilt (N3f); grey band +-5 %.
 (b) Distribution of the relative tilt beta_ab between neighbouring C3 axes at T_Ups^full (random start),

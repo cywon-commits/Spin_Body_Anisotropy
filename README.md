@@ -53,7 +53,7 @@ python scripts/fig1_model.py                # Fig. 1 model and symmetry schemati
 python scripts/n4_gamma_check.py            # data for Fig. 2 -> data/n4/gamma_check.json (needs polyspin v0.2.0-aniso)
 python scripts/fig2_axis_selection.py       # Fig. 2 axis selection: Gamma, kappa-space boundary, single-body check
 python scripts/fig3_phase_diagram.py        # Fig. 3 T-r phase diagram (N1, N2) with the decoupling approximation
-python scripts/fig4_crossing_collapse.py    # Fig. 4 Binder / Upsilon collapse and C_max vs ln L at r = 4.2, 4.4
+python scripts/fig4_crossing_collapse.py    # Fig. 4 Binder collapse, WM form of Upsilon at T_KT, C_max vs ln L at r = 4.2, 4.4
 python scripts/fig5_debye_waller.py         # Fig. 5 R = T_Ups^full / T_eff vs l_Gamma, three prescriptions
 ```
 

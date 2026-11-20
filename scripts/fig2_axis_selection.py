@@ -5,7 +5,8 @@ E_eff(n) = -Gamma sum_alpha n_alpha^4, Gamma = (35/9) a4 + 2 a2^2 (3/lam_E - 1/l
     and C3 (K = 1/3) axes.
 (b) Selection by a2 alone: S4 along z when 27 kappa1 - 63 kappa3 + 35 kappa4 = 27J + 9zG - 8zH4 > 0
     (kappa2 cancels, no K dependence); the line lies above the T-Sq boundary zH4 = 0.692K + 0.923zG for
-    K <= 2, so the C3 phase needs a4 < 0.  Diamonds: the N3 points.
+    K <= 2, so the C3 phase needs a4 < 0.  Grey: above the K = 2 T-Sq boundary the ground state is not
+    the T phase (the conclusion is restricted to K <= 2).  Diamonds: the N3 points.
 (c) Relative deviation of the numerical Gamma from the formula vs anisotropy amplitude: linear,
     i.e. next order (a4^2, a2^3); the +-a2 average is exact to 0.06 %.
 Reads data/n4/gamma_check.json (scripts/n4_gamma_check.py).
@@ -40,7 +41,10 @@ a.legend(loc="upper left")
 zg = np.linspace(0, 1.2, 50)
 b.fill_between(zg, (27 + 9 * zg) / 8, 4.2, color=OI["sky"], alpha=0.35, lw=0)
 b.fill_between(zg, 0, (27 + 9 * zg) / 8, color=OI["orange"], alpha=0.25, lw=0)
+b.fill_between(zg, 0.692 * 2 + 0.923 * zg, 4.2, facecolor="0.55", alpha=0.45, lw=0, hatch="////", edgecolor="0.4")
 b.plot(zg, (27 + 9 * zg) / 8, c="k", lw=0.9)
+b.text(0.45, 2.45, "not T phase (above T–Sq, K = 2)", fontsize=6.3, ha="left",
+       bbox=dict(boxstyle="square,pad=0.15", fc="white", ec="none", alpha=0.85))
 b.text(0.05, 3.85, r"$a_4=0$: $C_3\parallel\hat z$", fontsize=6.5)
 b.text(0.05, 2.75, r"$a_4=0$: $S_4\parallel\hat z$", fontsize=6.5)
 b.text(1.18, 3.42, r"$27\kappa_1-63\kappa_3+35\kappa_4=0$", fontsize=6, ha="right", va="bottom")
@@ -49,7 +53,7 @@ for Kk, ls in ((0.5, ":"), (2.0, "--")):
 b.plot([0.08] * 3, [0.72, 0.80, 0.88], "D", c=OI["blue"], ms=3, label="N3 points (K = 2)")
 b.set_xlim(0, 1.2); b.set_ylim(0, 4.2)
 b.set_xlabel(r"$zG/J$"); b.set_ylabel(r"$zH_4/J$")
-b.legend(loc="center right", fontsize=5.8)
+b.legend(loc="lower right", fontsize=5.6, frameon=True, framealpha=0.9, facecolor="white", edgecolor="none")
 
 T = D["table"]
 amp4 = [-t["a4"] for t in T if t["a2"] == 0]; dev4 = [t["numeric"] / t["formula"] - 1 for t in T if t["a2"] == 0]
