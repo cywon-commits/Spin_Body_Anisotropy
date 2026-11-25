@@ -50,14 +50,14 @@ cr = N1["crossing"]["main"]; syst = N1["crossing"]["syst_r"]
 
 fig, (a, b) = plt.subplots(2, 1, figsize=(WIDTH, 5.0), gridspec_kw=dict(height_ratios=[1.35, 1]))
 rr = np.linspace(3.5, 6.15, 200)
-a.plot(rr, [kt_line(x) for x in rr], c=OI["blue"], lw=0.8, ls="--", label="KT, decoupling approx. (P6)")
+a.plot(rr, [kt_line(x) for x in rr], c=OI["blue"], lw=0.8, ls="--", label="KT, decoupling approx.")
 a.plot(rr, np.full_like(rr, TX_AN), c=OI["red"], lw=0.8, ls=":",
-       label=r"Ising, decoupling approx. (P7, $c_\psi$ = 0.723)")
+       label=r"Ising, decoupling approx. ($c_\psi$ = 0.723)")
 a.plot(r, TI, "-", c=OI["red"], lw=0.5); a.plot(r, TK, "-", c=OI["blue"], lw=0.5)
 a.errorbar(r, TI, dTI, fmt="o", c=OI["red"], label=r"Ising $T_I$")
 a.errorbar(r, TK, dTK, fmt="s", c=OI["blue"], label=r"KT $T_{KT}$")
 a.plot(r[n2], TI[n2], "o", mfc="none", mec="k", ms=6, mew=0.6)
-a.plot(r[n2], TK[n2], "s", mfc="none", mec="k", ms=6, mew=0.6, label="N2 (inverted order)")
+a.plot(r[n2], TK[n2], "s", mfc="none", mec="k", ms=6, mew=0.6, label="inverted-order runs")
 r5 = N2["5.0"]; a.plot([5.0, 5.0], [r5["TI"], r5["TKT"]], c="k", lw=0.6)
 a.errorbar([cr["r_x"]], [cr["T_x"]], xerr=[np.hypot(cr["dr_x"], syst)], yerr=[cr["dT_x"]], fmt="*", c="k", ms=7,
            label=r"crossing $(r_\times,T_\times)$")

@@ -50,7 +50,7 @@ b.text(0.05, 2.75, r"$a_4=0$: $S_4\parallel\hat z$", fontsize=6.5)
 b.text(1.18, 3.42, r"$27\kappa_1-63\kappa_3+35\kappa_4=0$", fontsize=6, ha="right", va="bottom")
 for Kk, ls in ((0.5, ":"), (2.0, "--")):
     b.plot(zg, 0.692 * Kk + 0.923 * zg, c=OI["red"], lw=0.8, ls=ls, label=f"T–Sq boundary, K = {Kk:g}")
-b.plot([0.08] * 3, [0.72, 0.80, 0.88], "D", c=OI["blue"], ms=3, label="N3 points (K = 2)")
+b.plot([0.08] * 3, [0.72, 0.80, 0.88], "D", c=OI["blue"], ms=3, label="full-model points (K = 2)")
 b.set_xlim(0, 1.2); b.set_ylim(0, 4.2)
 b.set_xlabel(r"$zG/J$"); b.set_ylabel(r"$zH_4/J$")
 b.legend(loc="lower right", fontsize=5.6, frameon=True, framealpha=0.9, facecolor="white", edgecolor="none")
